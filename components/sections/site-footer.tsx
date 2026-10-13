@@ -7,8 +7,16 @@ export function SiteFooter() {
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-5 px-5 text-center md:px-8">
         <BrandLockup size="lg" />
         <p className="text-sm text-cream/55">حلويات · مخبوزات · عصائر · فاست فود</p>
-        <div className="flex items-center justify-center gap-2 text-xs text-cream/35">
+        <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-cream/45">
           <span>© {new Date().getFullYear()} الشامي، جميع الحقوق محفوظة</span>
+          <span>·</span>
+          <Link href="/menu" className="hover:text-copper transition-colors underline-offset-4 hover:underline">
+            منيو الطاولات والطلب الذاتي
+          </Link>
+          <span>·</span>
+          <Link href="/orders-admin" className="hover:text-copper transition-colors underline-offset-4 hover:underline">
+            كاشير الطلبات
+          </Link>
           <span>·</span>
           <Link href="/admin" className="hover:text-copper transition-colors underline-offset-4 hover:underline">
             لوحة الإدارة

@@ -393,13 +393,29 @@ export default function AdminPage() {
             </Link>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
+            <Link
+              href="/orders-admin"
+              className="flex items-center gap-1.5 rounded-xl border border-neon/30 bg-neon/10 px-3 py-2 text-xs font-semibold text-neon hover:bg-neon/20 transition-colors"
+            >
+              <span>🧾 كاشير الطلبات</span>
+            </Link>
+
+            <Link
+              href="/menu"
+              target="_blank"
+              className="hidden md:flex items-center gap-1.5 rounded-xl border border-copper/30 bg-copper/10 px-3 py-2 text-xs font-semibold text-copper hover:bg-copper/20 transition-colors"
+            >
+              <span>🍽️ منيو الطاولات</span>
+              <ExternalLink className="size-3.5" />
+            </Link>
+
             <Link
               href="/"
               target="_blank"
               className="hidden sm:flex items-center gap-1.5 rounded-xl border border-cream/15 px-3 py-2 text-xs font-semibold text-cream/80 hover:bg-cream/5 hover:text-cream transition-colors"
             >
-              <span>عرض الموقع كزبون</span>
+              <span>عرض الموقع</span>
               <ExternalLink className="size-3.5" />
             </Link>
 

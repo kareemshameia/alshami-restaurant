@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { BrandLockup } from "@/components/brand/brand-lockup"
 import { HeaderCartButton } from "./header-cart-button"
 import { cn } from "@/lib/utils"
@@ -89,7 +90,14 @@ export function SiteHeader() {
           </ul>
         </nav>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
+          <Link
+            href="/menu"
+            className="hidden sm:inline-flex items-center justify-center rounded-full border border-neon/30 bg-neon/10 px-3.5 py-2 text-xs font-semibold text-neon transition-all hover:bg-neon hover:text-ink active:scale-95"
+            title="منيو طلب الطاولات والطلب الذاتي"
+          >
+            منيو الطاولات 🍽️
+          </Link>
           <a
             href="#menu"
             className="flex h-10 items-center justify-center rounded-full bg-copper px-5 text-sm font-semibold text-ink shadow-[0_4px_18px_-4px_rgba(200,115,58,0.5)] transition-all duration-300 ease-out-expo hover:shadow-[0_6px_24px_-4px_rgba(200,115,58,0.7)] active:scale-95 md:hover:-translate-y-0.5"
