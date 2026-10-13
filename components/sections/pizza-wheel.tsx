@@ -9,10 +9,7 @@ import { PurchaseControls } from "@/components/menu/purchase-controls"
 import { SectionHeading } from "@/components/ui-kit/section-heading"
 import { cn } from "@/lib/utils"
 
-const SLOTS = 8
-const STEP = 360 / SLOTS
 const PX_PER_STEP = 90
-const MAX_DRAG = STEP * 2.4
 
 const mod = (n: number, m: number) => ((n % m) + m) % m
 const pad = (n: number) => String(n).padStart(2, "0")
@@ -26,22 +23,29 @@ type DragState = { id: number; x: number; y: number; type: string; deg: number; 
 
 export function PizzaWheel() {
   const { items } = useLiveMenu()
-  const PIZZAS = items.filter((item) => item.category === "pizza").length > 0
-    ? items.filter((item) => item.category === "pizza")
-    : MENU.filter((item) => item.category === "pizza")
+  const rawPizzas = items.filter((item) => item.category === "pizza")
+  const PIZZAS = rawPizzas.length > 0 ? rawPizzas : MENU.filter((item) => item.category === "pizza")
+
+  // Ensure SLOTS is always an exact multiple of PIZZAS.length (at least 4 slots for smooth circular wheel)
+  const count = PIZZAS.length || 1
+  const multiplier = count >= 4 ? 1 : Math.ceil(4 / count)
+  const SLOTS = count * multiplier
+  const STEP = 360 / SLOTS
+  const MAX_DRAG = STEP * 2.4
 
   const [step, setStep] = useState(0)
   const rotorRef = useRef<HTMLDivElement>(null)
   const drag = useRef<DragState | null>(null)
   const didDrag = useRef(false)
 
+  // Current active pizza is GUARANTEED to match the active slot on the wheel!
   const activeIndex = mod(step, PIZZAS.length)
   const pizza = PIZZAS[activeIndex] || PIZZAS[0]
   const rotation = step * STEP
 
   const shift = (delta: number) => setStep((s) => s + delta)
-  const selectSlot = (slot: number) => shift(shortestDelta(slot, step, SLOTS))
-  const selectPizza = (index: number) => shift(shortestDelta(index, activeIndex, PIZZAS.length))
+  const selectSlot = (slot: number) => shift(shortestDelta(slot, mod(step, SLOTS), SLOTS))
+  const selectPizza = (index: number) => shift(shortestDelta(index, mod(step, PIZZAS.length), PIZZAS.length))
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return
@@ -141,9 +145,10 @@ export function PizzaWheel() {
               <div className="wheel-ring" />
               {Array.from({ length: SLOTS }, (_, slot) => {
                 const item = PIZZAS[slot % PIZZAS.length]
-                const offset = shortestDelta(slot, step, SLOTS)
+                const offset = shortestDelta(slot, mod(step, SLOTS), SLOTS)
                 const isActive = offset === 0
-                const hidden = Math.abs(offset) > 2
+                const maxVisible = SLOTS >= 7 ? 2 : 1
+                const hidden = Math.abs(offset) > maxVisible
                 return (
                   <div
                     key={slot}
@@ -164,8 +169,8 @@ export function PizzaWheel() {
                       }}
                     >
                       <Image
-                        src={item.topImage ?? item.image}
-                        alt=""
+                        src={item.topImage || item.image || "/placeholder.svg"}
+                        alt={item.name}
                         fill
                         draggable={false}
                         sizes="(max-width: 768px) 38vw, 13rem"
