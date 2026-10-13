@@ -204,6 +204,7 @@ export default function AdminPage() {
       name?: string
       image?: string
       description?: string
+      price?: number
     }[]
   }>({
     title: "اشرب الشامي",
@@ -332,7 +333,7 @@ export default function AdminPage() {
 
   const handleUpdateShowcaseItem = (
     index: number,
-    patch: Partial<{ id: string; bg: string; slogan: string; name?: string; image?: string; description?: string }>
+    patch: Partial<{ id: string; bg: string; slogan: string; name?: string; image?: string; description?: string; price?: number }>
   ) => {
     setShowcaseConfig((prev) => {
       const newItems = [...prev.items]
@@ -945,7 +946,9 @@ export default function AdminPage() {
               {showcaseConfig.items.map((slide, index) => {
                 const matchedItem = items.find((i) => i.id === slide.id)
                 const drinkImage = slide.image || matchedItem?.image || "/placeholder.svg"
-                const drinkName = slide.name || matchedItem?.name || slide.id
+                const drinkName = slide.name !== undefined ? slide.name : (matchedItem?.name || slide.id)
+                const drinkDesc = slide.description !== undefined ? slide.description : (matchedItem?.description || "")
+                const drinkPrice = slide.price !== undefined ? slide.price : (matchedItem?.price || 15)
                 const availableDrinks = items.filter((i) => i.category === "drinks")
 
                 return (
@@ -974,7 +977,7 @@ export default function AdminPage() {
                         </div>
                         <div>
                           <h4 className="font-display text-base font-bold text-cream">
-                            {drinkName}
+                            {drinkName || "اكتب اسم المشروب"}
                           </h4>
                           <span className="text-xs text-cream/50">
                             معرّف المشروب: {slide.id}
@@ -1013,52 +1016,89 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {/* Inputs Row */}
+                    {/* Inputs Row: Free text typing for name, slogan, description and price */}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      {/* 1. Select Drink from menu */}
+                      {/* 1. Drink Name (Free text typing) */}
                       <div>
-                        <label className="text-xs font-bold text-cream/70 block mb-1.5">
-                          المشروب المربوط من القائمة
-                        </label>
-                        <select
-                          value={slide.id}
-                          onChange={(e) => {
-                            const selectedId = e.target.value
-                            const found = items.find((i) => i.id === selectedId)
-                            if (found) {
-                              handleUpdateShowcaseItem(index, {
-                                id: found.id,
-                                name: found.name,
-                                image: found.image,
-                              })
-                            } else {
-                              handleUpdateShowcaseItem(index, { id: selectedId })
-                            }
-                          }}
-                          className="h-11 w-full rounded-xl border border-cream/15 bg-ink px-3 text-xs text-cream outline-none focus:border-neon"
-                        >
-                          {availableDrinks.map((d) => (
-                            <option key={d.id} value={d.id}>
-                              🍹 {d.name} ({d.price}₪)
-                            </option>
-                          ))}
-                          {!availableDrinks.some((d) => d.id === slide.id) && (
-                            <option value={slide.id}>{slide.name || slide.id}</option>
-                          )}
-                        </select>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-bold text-cream">
+                            اسم المشروب (اكتب أي اسم تريده) ✏️
+                          </label>
+                          {/* Quick fill from existing menu drinks if they want */}
+                          <select
+                            onChange={(e) => {
+                              const found = items.find((i) => i.id === e.target.value)
+                              if (found) {
+                                handleUpdateShowcaseItem(index, {
+                                  id: found.id,
+                                  name: found.name,
+                                  description: found.description || "",
+                                  price: Number(found.price),
+                                  image: found.image,
+                                })
+                              }
+                            }}
+                            defaultValue=""
+                            className="bg-cream/10 text-[11px] text-cream/70 rounded-lg px-2 py-0.5 border border-cream/15 outline-none hover:text-cream cursor-pointer"
+                          >
+                            <option value="" disabled>⚡ تعبئة سريعة من المنيو...</option>
+                            {availableDrinks.map((d) => (
+                              <option key={d.id} value={d.id} className="bg-ink text-cream">
+                                {d.name} ({d.price}₪)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <input
+                          type="text"
+                          value={drinkName}
+                          onChange={(e) => handleUpdateShowcaseItem(index, { name: e.target.value })}
+                          placeholder="اكتب اسم المشروب (مثال: موهيتو الشامي الأزرق)"
+                          className="h-11 w-full rounded-xl border border-cream/15 bg-ink px-3.5 text-xs text-cream outline-none focus:border-neon font-bold"
+                        />
                       </div>
 
                       {/* 2. Slogan */}
                       <div>
-                        <label className="text-xs font-bold text-cream/70 block mb-1.5">
-                          العبارة التسويقية فوق المشروب
+                        <label className="text-xs font-bold text-cream block mb-1.5">
+                          العبارة التسويقية فوق المشروب ✏️
                         </label>
                         <input
                           type="text"
-                          value={slide.slogan}
+                          value={slide.slogan || ""}
                           onChange={(e) => handleUpdateShowcaseItem(index, { slogan: e.target.value })}
                           placeholder="مثال: طاقة ما بتخلص، حيوية بدون حدود"
                           className="h-11 w-full rounded-xl border border-cream/15 bg-ink px-3.5 text-xs text-cream outline-none focus:border-neon"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      {/* 3. Description (Free text typing) */}
+                      <div>
+                        <label className="text-xs font-bold text-cream/70 block mb-1.5">
+                          وصف ومكونات المشروب (اكتب أي وصف) ✏️
+                        </label>
+                        <input
+                          type="text"
+                          value={drinkDesc}
+                          onChange={(e) => handleUpdateShowcaseItem(index, { description: e.target.value })}
+                          placeholder="مثال: موهيتو منعش بنكهة التوت الأزرق والصودا الباردة"
+                          className="h-11 w-full rounded-xl border border-cream/15 bg-ink px-3.5 text-xs text-cream outline-none focus:border-neon"
+                        />
+                      </div>
+
+                      {/* 4. Price (Number) */}
+                      <div>
+                        <label className="text-xs font-bold text-cream/70 block mb-1.5">
+                          السعر (₪) ✏️
+                        </label>
+                        <input
+                          type="number"
+                          value={drinkPrice}
+                          onChange={(e) => handleUpdateShowcaseItem(index, { price: parseFloat(e.target.value) || 0 })}
+                          placeholder="السعر مثل 15 أو 20"
+                          className="h-11 w-full rounded-xl border border-cream/15 bg-ink px-3.5 text-xs font-bold text-neon outline-none focus:border-neon"
                         />
                       </div>
                     </div>
@@ -1152,13 +1192,16 @@ export default function AdminPage() {
                         </div>
                         <div className="text-right">
                           <span className="text-xs font-bold text-cream/70 block">
-                            {slide.slogan}
+                            {slide.slogan || "العبارة التسويقية"}
                           </span>
                           <h4 className="font-display text-lg sm:text-xl font-bold text-cream drop-shadow">
-                            {drinkName}
+                            {drinkName || "اسم المشروب"}
                           </h4>
-                          <span className="text-[11px] text-cream/60">
-                            {matchedItem?.description || "منعش ولذيذ"}
+                          <span className="text-[11px] text-cream/60 block">
+                            {drinkDesc || matchedItem?.description || "منعش ولذيذ"}
+                          </span>
+                          <span className="mt-1 inline-block font-mono text-xs font-bold text-neon">
+                            {drinkPrice}₪
                           </span>
                         </div>
                       </div>

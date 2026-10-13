@@ -137,6 +137,7 @@ export function JuicesSection() {
         ...(d.name ? { name: d.name } : {}),
         ...(d.image ? { image: d.image } : {}),
         ...(d.description ? { description: d.description } : {}),
+        ...(d.price !== undefined && !isNaN(Number(d.price)) ? { price: Number(d.price) } : {}),
       },
     }
   })
