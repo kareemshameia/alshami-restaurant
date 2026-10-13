@@ -1014,7 +1014,7 @@ export default function AdminPage() {
                     </div>
 
                     {/* Inputs Row */}
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       {/* 1. Select Drink from menu */}
                       <div>
                         <label className="text-xs font-bold text-cream/70 block mb-1.5">
@@ -1061,21 +1061,16 @@ export default function AdminPage() {
                           className="h-11 w-full rounded-xl border border-cream/15 bg-ink px-3.5 text-xs text-cream outline-none focus:border-neon"
                         />
                       </div>
+                    </div>
 
-                      {/* 3. Custom Image URL or Override (optional) */}
-                      <div>
-                        <label className="text-xs font-bold text-cream/70 block mb-1.5">
-                          رابط صورة مخصص (اختياري)
-                        </label>
-                        <input
-                          type="text"
-                          value={slide.image || ""}
-                          onChange={(e) => handleUpdateShowcaseItem(index, { image: e.target.value })}
-                          placeholder="اتركه فارغاً لاعتماد صورة الوجبة"
-                          className="h-11 w-full rounded-xl border border-cream/15 bg-ink px-3.5 text-xs text-cream outline-none focus:border-neon text-left"
-                          dir="ltr"
-                        />
-                      </div>
+                    {/* 3. Image Upload from Device for this Slide */}
+                    <div className="rounded-2xl border border-cream/10 bg-ink/50 p-4">
+                      <ImageUploader
+                        value={slide.image || ""}
+                        onChange={(newUrl) => handleUpdateShowcaseItem(index, { image: newUrl })}
+                        label="صورة المشروب في السلايدر (رفع صورة من جهازك)"
+                        placeholder="اتركه فارغاً لاعتماد صورة المشروب الأصلية"
+                      />
                     </div>
 
                     {/* Color Customization Row */}

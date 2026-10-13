@@ -10,9 +10,17 @@ interface ImageUploaderProps {
   value: string
   onChange: (url: string) => void
   disabled?: boolean
+  label?: string
+  placeholder?: string
 }
 
-export function ImageUploader({ value, onChange, disabled }: ImageUploaderProps) {
+export function ImageUploader({
+  value,
+  onChange,
+  disabled,
+  label,
+  placeholder,
+}: ImageUploaderProps) {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -111,7 +119,7 @@ export function ImageUploader({ value, onChange, disabled }: ImageUploaderProps)
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold text-cream flex items-center gap-1.5">
           <ImageIcon className="size-4 text-copper" />
-          صورة الوجبة
+          {label || "صورة الوجبة"}
         </span>
         <button
           type="button"
@@ -131,7 +139,7 @@ export function ImageUploader({ value, onChange, disabled }: ImageUploaderProps)
               setLocalPreview(null)
               onChange(e.target.value)
             }}
-            placeholder="مثال: /images/hero-pizza.webp أو رابط صورة خارجي"
+            placeholder={placeholder || "مثال: /images/hero-pizza.webp أو رابط صورة خارجي"}
             className="h-11 w-full rounded-xl border border-cream/15 bg-ink px-3.5 text-xs text-cream outline-none focus:border-neon"
           />
           <p className="text-[10px] text-cream/40">يمكنك وضع مسار من مجلد الصور أو رابط ويب مباشر.</p>
