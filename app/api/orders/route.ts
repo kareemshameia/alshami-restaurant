@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic"
 export async function POST(request: Request) {
   try {
     const input = await parseBody(request)
-    const catalog = getCatalog()
+    const catalog = await getCatalog()
     const order = validateOrder(input, catalog)
 
     const receiptHash = digest(input.receiptToken)

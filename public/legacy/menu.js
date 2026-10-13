@@ -1,9 +1,14 @@
 (() => {
 'use strict';
-const items = window.MENU_ITEMS;
+let items = Array.isArray(window.MENU_ITEMS) ? window.MENU_ITEMS : [];
 const categories = {pizza:'بيتزا',fastfood:'برجر وفاست فود',drinks:'عصائر ومشروبات',desserts:'كيك وحلويات'};
-const byId = new Map(items.map(x=>[x.id,x]));
+let byId = new Map(items.map(x=>[x.id,x]));
 const sizes = new Map(items.map(x=>[x.id,x.sizes?.[0]?.label || '']));
+function imgUrl(src){
+  if(!src) return 'images/hero-pizza.webp';
+  if(src.startsWith('http://')||src.startsWith('https://')) return src;
+  return src.replace(/^\//,'');
+}
 const $ = s=>document.querySelector(s);
 const esc = s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
@@ -14,7 +19,7 @@ try{const raw=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(raw))
 const itemPrice = (id,size)=>{const p=byId.get(id);return p.sizes?.find(x=>x.label===size)?.price??p.price;};
 const total = ()=>cart.reduce((a,x)=>a+itemPrice(x.id,x.size)*x.qty,0);
 const count = ()=>cart.reduce((a,x)=>a+x.qty,0);
-function productCard(p,i){const size=sizes.get(p.id);return `<li class="product-card" style="--index:${i}" data-product="${esc(p.id)}"><div class="product-photo"><img src="${esc(p.image.replace(/^\//,''))}" alt="${esc(p.name)}" width="400" height="300" loading="${i<2?'eager':'lazy'}" decoding="async">${p.tag?`<span class="product-tag">${esc(p.tag)}</span>`:''}</div><div class="product-content"><div><h2>${esc(p.name)}</h2><p>${esc(p.description)}</p></div>${p.sizes?`<div class="product-options" role="radiogroup" aria-label="اختر الحجم أو النكهة لـ ${esc(p.name)}">${p.sizes.map(s=>`<button type="button" class="size-option" role="radio" data-size="${esc(s.label)}" aria-checked="${size===s.label}" tabindex="${size===s.label?'0':'-1'}">${esc(s.label)}</button>`).join('')}</div>`:''}<div class="product-bottom"><span class="price">${p.id==='cake-wedding'?'<small class="from-price">يبدأ من</small>':''}<span class="price-value">${itemPrice(p.id,size)}</span><small>شيكل</small></span><button class="add-button" type="button" data-add="${esc(p.id)}" aria-label="أضف ${esc(p.name)} للطلب">${icon}<span>أضف</span></button></div></div></li>`;}
+function productCard(p,i){const size=sizes.get(p.id);return `<li class="product-card" style="--index:${i}" data-product="${esc(p.id)}"><div class="product-photo"><img src="${esc(imgUrl(p.image))}" alt="${esc(p.name)}" width="400" height="300" loading="${i<2?'eager':'lazy'}" decoding="async">${p.tag?`<span class="product-tag">${esc(p.tag)}</span>`:''}</div><div class="product-content"><div><h2>${esc(p.name)}</h2><p>${esc(p.description)}</p></div>${p.sizes?`<div class="product-options" role="radiogroup" aria-label="اختر الحجم أو النكهة لـ ${esc(p.name)}">${p.sizes.map(s=>`<button type="button" class="size-option" role="radio" data-size="${esc(s.label)}" aria-checked="${size===s.label}" tabindex="${size===s.label?'0':'-1'}">${esc(s.label)}</button>`).join('')}</div>`:''}<div class="product-bottom"><span class="price">${p.id==='cake-wedding'?'<small class="from-price">يبدأ من</small>':''}<span class="price-value">${itemPrice(p.id,size)}</span><small>شيكل</small></span><button class="add-button" type="button" data-add="${esc(p.id)}" aria-label="أضف ${esc(p.name)} للطلب">${icon}<span>أضف</span></button></div></div></li>`;}
 function renderProducts(){const filtered=items.filter(x=>x.category===active);$('#menu-panel').innerHTML=filtered.map(productCard).join('');$('#category-title').textContent=categories[active];$('#item-count').textContent=filtered.length+' أصناف';$('#menu-panel').setAttribute('aria-labelledby','tab-'+active);document.querySelectorAll('[data-category]').forEach(b=>{const on=b.dataset.category===active;b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1;});}
 function selectCategory(category){active=category;renderProducts();const b=$('#tab-'+category);b.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'});}
 function persist(){try{localStorage.setItem(key,JSON.stringify(cart));}catch{}updateCart();}
@@ -22,7 +27,7 @@ function notify(message){clearTimeout(toastTimer);$('#toast').textContent=messag
 function add(id,button){const size=sizes.get(id)||'';const row=cart.find(x=>x.id===id&&x.size===size);if(row&&row.qty>=50){notify('وصلت للحد الأقصى من هذا الصنف');return;}if(row)row.qty++;else cart.push({id,size,qty:1});persist();notify('انضاف '+byId.get(id).name+' لطلبك');button.classList.add('just-added');button.querySelector('span').textContent='انضاف';setTimeout(()=>{if(button.isConnected){button.classList.remove('just-added');button.querySelector('span').textContent='أضف';}},1100);}
 function whatsapp(){ /* Submission is handled by the restaurant order API. */ }
 function updateCart(){const n=count();$('.cart-count').textContent=n;$('.cart-count').hidden=!n;$('.cart-button').setAttribute('aria-label','سلة الطلب، '+n+' أصناف');$('.basket-dock').hidden=!n;document.body.classList.toggle('has-items',!!n);$('#dock-count').textContent=n+' في السلة';$('#dock-total').textContent=total();$('#cart-total').textContent=total();$('#cart-bottom').hidden=!n;$('#order-fields').hidden=!n;
-$('#cart-items').innerHTML=cart.length?cart.map((x,i)=>`<article class="cart-line"><img src="${esc(byId.get(x.id).image.replace(/^\//,''))}" alt="${esc(byId.get(x.id).name)}"><div class="cart-info"><h3>${esc(byId.get(x.id).name)}</h3><p>${esc(x.size||'الحجم العادي')} · ${itemPrice(x.id,x.size)} شيكل</p><div class="cart-controls"><div class="quantity-controls"><button type="button" data-quantity="${i}" data-delta="1" aria-label="زيادة ${esc(byId.get(x.id).name)}" ${x.qty>=50?'disabled':''}>+</button><span>${x.qty}</span><button type="button" data-quantity="${i}" data-delta="-1" aria-label="تقليل ${esc(byId.get(x.id).name)}">−</button></div><span class="line-total">${itemPrice(x.id,x.size)*x.qty} <small>شيكل</small></span></div></div><button type="button" class="remove-line" data-remove="${i}" aria-label="حذف ${esc(byId.get(x.id).name)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button></article>`).join(''):`<div class="cart-empty">${basketIcon}<strong>شو نضيف لطلبك؟</strong><p>السلة لسه فاضية. اختار إشي بتحبّه من المنيو.</p><button type="button" data-close-cart>تصفّح المنيو</button></div>`;whatsapp();}
+$('#cart-items').innerHTML=cart.length?cart.map((x,i)=>`<article class="cart-line"><img src="${esc(imgUrl(byId.get(x.id)?.image))}" alt="${esc(byId.get(x.id)?.name || '')}"><div class="cart-info"><h3>${esc(byId.get(x.id)?.name || '')}</h3><p>${esc(x.size||'الحجم العادي')} · ${itemPrice(x.id,x.size)} شيكل</p><div class="cart-controls"><div class="quantity-controls"><button type="button" data-quantity="${i}" data-delta="1" aria-label="زيادة ${esc(byId.get(x.id)?.name || '')}" ${x.qty>=50?'disabled':''}>+</button><span>${x.qty}</span><button type="button" data-quantity="${i}" data-delta="-1" aria-label="تقليل ${esc(byId.get(x.id)?.name || '')}">−</button></div><span class="line-total">${itemPrice(x.id,x.size)*x.qty} <small>شيكل</small></span></div></div><button type="button" class="remove-line" data-remove="${i}" aria-label="حذف ${esc(byId.get(x.id)?.name || '')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg></button></article>`).join(''):`<div class="cart-empty">${basketIcon}<strong>شو نضيف لطلبك؟</strong><p>السلة لسه فاضية. اختار إشي بتحبّه من المنيو.</p><button type="button" data-close-cart>تصفّح المنيو</button></div>`;whatsapp();}
 const dialog=$('#cart-dialog');
 function openCart(){savedFocus=document.activeElement;updateCart();dialog.showModal();document.body.style.overflow='hidden';}
 function closeCart(){dialog.close();}
@@ -48,6 +53,28 @@ $('#close-receipt').addEventListener('click',()=>$('#receipt-dialog').close());
 $('#submit-order').addEventListener('click',async()=>{if(sending)return;const tableNumber=$('#table-number').value.trim();if(!/^[1-9][0-9]{0,2}$/.test(tableNumber)){$('#table-number').focus();$('#send-error').textContent='أدخل رقم الطاولة من 1 إلى 999';$('#send-error').hidden=false;return;}if(!cart.length)return;const draft={tableNumber,notes:$('#order-notes').value.trim(),items:cart.map(x=>({...x}))},fingerprint=JSON.stringify(draft);if(!pending||pending.fingerprint!==fingerprint){pending={...draft,requestKey:crypto.randomUUID(),receiptToken:token(),fingerprint};safeStore(pendingKey,pending);}sending=true;$('#submit-order').disabled=true;$('#submit-order').textContent='جاري إرسال الطلب…';$('#send-error').hidden=true;try{const response=await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pending)});const data=await response.json();if(!response.ok)throw new Error(data.error||'تعذّر إرسال الطلب');receipt={id:data.order.id,token:pending.receiptToken};safeStore(receiptKey,receipt);try{localStorage.removeItem(pendingKey);localStorage.setItem('alshami-table',tableNumber);}catch{}pending=null;cart=[];persist();closeCart();renderReceipt(data.order);openReceipt();notify('وصل طلبك للكاشير. بانتظار القبول');}catch(e){$('#send-error').textContent=(e.message||'تعذّر الإرسال')+' — السلة محفوظة، وإعادة المحاولة لا تكرر الطلب.';$('#send-error').hidden=false;}finally{sending=false;$('#submit-order').disabled=false;$('#submit-order').textContent='إرسال الطلب للكاشير';}});
 if(receipt){$('#track-order').hidden=false;refreshReceipt();}
 setInterval(()=>{if(!trackedOrder||!['completed','rejected'].includes(trackedOrder.status))refreshReceipt();},5000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshReceipt();});
+async function syncLiveCatalog(){
+  try{
+    const res = await fetch('/api/catalog', { cache: 'no-store' });
+    if(res.ok){
+      const data = await res.json();
+      if(Array.isArray(data) && data.length > 0){
+        items = data;
+        byId = new Map(items.map(x=>[x.id,x]));
+        items.forEach(x => {
+          if(!sizes.has(x.id)){
+            sizes.set(x.id, x.sizes?.[0]?.label || '');
+          }
+        });
+        renderProducts();
+        updateCart();
+      }
+    }
+  }catch{}
+}
+syncLiveCatalog();
+setInterval(syncLiveCatalog, 4000);
+window.addEventListener('focus', syncLiveCatalog);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshReceipt();syncLiveCatalog();}});
 
 })();

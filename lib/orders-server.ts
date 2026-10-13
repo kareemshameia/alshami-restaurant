@@ -7,7 +7,33 @@ const SECRET = process.env.ADMIN_SESSION_SECRET || "alshami-cashier-secret-salt-
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || process.env.NEXT_PUBLIC_ADMIN_PIN || "1234"
 const SESSION_TTL = 43200 // 12 hours in seconds
 
-export function getCatalog() {
+export async function getCatalog(): Promise<any[]> {
+  try {
+    const { data, error } = await supabase
+      .from("menu_items")
+      .select("*")
+      .eq("available", true)
+      .order("sort_order", { ascending: true })
+
+    if (!error && data && data.length > 0) {
+      return data.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        description: row.description || "",
+        category: row.category,
+        image: row.image,
+        topImage: row.top_image || undefined,
+        price: Number(row.price),
+        sizes:
+          row.sizes && Array.isArray(row.sizes) && row.sizes.length > 0
+            ? row.sizes
+            : undefined,
+        tag: row.tag || undefined,
+      }))
+    }
+  } catch (e) {
+    console.error("Failed to fetch live catalog from Supabase:", e)
+  }
   return catalogData as any[]
 }
 

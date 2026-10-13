@@ -41,6 +41,13 @@ export function MenuProvider({ children }: { children: ReactNode }) {
 
     loadMenu()
 
+    const onFocus = () => loadMenu()
+    window.addEventListener("focus", onFocus)
+    const onVisibility = () => {
+      if (!document.hidden) loadMenu()
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+
     // 2. Realtime WebSocket subscription for live synchronization
     const channel = supabase
       .channel("realtime:menu_items")

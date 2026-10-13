@@ -37,6 +37,68 @@ const CATEGORIES = [
   { id: "desserts", label: "حلويات وكيك", emoji: "🍰" },
 ]
 
+function QuickPriceInput({
+  item,
+  onSave,
+}: {
+  item: DBMenuItem
+  onSave: (val: number) => Promise<void>
+}) {
+  const [val, setVal] = useState(String(item.price))
+  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle")
+
+  useEffect(() => {
+    setVal(String(item.price))
+  }, [item.price])
+
+  const commit = async () => {
+    const num = parseFloat(val)
+    if (isNaN(num) || num <= 0 || num === item.price) {
+      setVal(String(item.price))
+      return
+    }
+    setStatus("saving")
+    await onSave(num)
+    setStatus("saved")
+    setTimeout(() => setStatus("idle"), 2500)
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-xs text-cream/50">السعر:</span>
+      <div
+        className={cn(
+          "flex items-center rounded-xl border bg-ink px-2.5 py-1 transition-all duration-200",
+          status === "saved"
+            ? "border-neon bg-forest/20 text-neon shadow-[0_0_10px_rgba(124,252,58,0.2)]"
+            : status === "saving"
+            ? "border-copper/60 bg-copper/10"
+            : "border-cream/15 focus-within:border-neon focus-within:ring-1 focus-within:ring-neon/30"
+        )}
+      >
+        <input
+          type="number"
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.currentTarget.blur()
+            }
+          }}
+          className="w-14 bg-transparent font-display text-sm font-bold text-neon outline-none"
+        />
+        <span className="text-xs font-semibold text-cream/50">₪</span>
+      </div>
+      {status === "saved" && (
+        <span className="text-[10px] font-bold text-neon animate-in fade-in zoom-in-75">
+          ✓ تم
+        </span>
+      )}
+    </div>
+  )
+}
+
 export default function AdminPage() {
   // Authentication State
   const [pin, setPin] = useState("")
@@ -120,17 +182,48 @@ export default function AdminPage() {
   // Quick Price update directly from the card
   const handleQuickPriceChange = async (id: string, newPrice: number) => {
     if (isNaN(newPrice) || newPrice <= 0) return
-    startTransition(async () => {
+
+    const targetItem = items.find((i) => i.id === id)
+    if (!targetItem || targetItem.price === newPrice) return
+
+    // If item has sizes, sync the base size price as well
+    let updatedSizes = targetItem.sizes
+    if (Array.isArray(updatedSizes) && updatedSizes.length > 0) {
+      updatedSizes = updatedSizes.map((s, idx) => (idx === 0 ? { ...s, price: newPrice } : s))
+    }
+
+    // Optimistic instant state update
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, price: newPrice, sizes: updatedSizes } : item
+      )
+    )
+
+    try {
+      const updatePayload: any = {
+        price: newPrice,
+        updated_at: new Date().toISOString(),
+      }
+      if (updatedSizes) {
+        updatePayload.sizes = updatedSizes
+      }
+
       const { error } = await supabase
         .from("menu_items")
-        .update({ price: newPrice, updated_at: new Date().toISOString() })
+        .update(updatePayload)
         .eq("id", id)
 
-      if (!error) {
-        setItems((prev) => prev.map((item) => (item.id === id ? { ...item, price: newPrice } : item)))
-        showNotification("تم تحديث السعر بنجاح!")
+      if (error) {
+        console.error("Price update error:", error)
+        showNotification("❌ تعذر تحديث السعر في قاعدة البيانات")
+        fetchItems()
+      } else {
+        showNotification(`⚡ تم تحديث سعر (${targetItem.name}) إلى ${newPrice}₪ فوراً!`)
       }
-    })
+    } catch (err) {
+      console.error("Price update error:", err)
+      fetchItems()
+    }
   }
 
   // Toggle availability (In stock / Out of stock)
@@ -231,8 +324,10 @@ export default function AdminPage() {
     setIsSaving(true)
 
     try {
-      const finalImage = formImage.trim() || "/images/hero-pizza.webp"
-      const finalSizes = hasSizes && sizesList.length > 0 ? sizesList : []
+      const finalSizes =
+        hasSizes && sizesList.length > 0
+          ? sizesList.map((s, idx) => (idx === 0 ? { ...s, price: numPrice } : s))
+          : []
 
       const payload = {
         name: cleanName,
@@ -596,23 +691,10 @@ export default function AdminPage() {
                   {/* Quick Price Editor + Actions */}
                   <div className="mt-auto border-t border-cream/10 pt-4">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-cream/50">السعر:</span>
-                        <div className="flex items-center rounded-xl border border-cream/15 bg-ink px-2.5 py-1 focus-within:border-neon">
-                          <input
-                            type="number"
-                            defaultValue={item.price}
-                            onBlur={(e) => handleQuickPriceChange(item.id, parseFloat(e.target.value))}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                handleQuickPriceChange(item.id, parseFloat(e.currentTarget.value))
-                              }
-                            }}
-                            className="w-14 bg-transparent font-display text-sm font-bold text-neon outline-none"
-                          />
-                          <span className="text-xs font-semibold text-cream/50">₪</span>
-                        </div>
-                      </div>
+                      <QuickPriceInput
+                        item={item}
+                        onSave={(val) => handleQuickPriceChange(item.id, val)}
+                      />
 
                       {/* Action buttons */}
                       <div className="flex items-center gap-1.5">
