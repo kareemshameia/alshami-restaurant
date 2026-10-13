@@ -53,12 +53,22 @@ $('#close-receipt').addEventListener('click',()=>$('#receipt-dialog').close());
 $('#submit-order').addEventListener('click',async()=>{if(sending)return;const tableNumber=$('#table-number').value.trim();if(!/^[1-9][0-9]{0,2}$/.test(tableNumber)){$('#table-number').focus();$('#send-error').textContent='أدخل رقم الطاولة من 1 إلى 999';$('#send-error').hidden=false;return;}if(!cart.length)return;const draft={tableNumber,notes:$('#order-notes').value.trim(),items:cart.map(x=>({...x}))},fingerprint=JSON.stringify(draft);if(!pending||pending.fingerprint!==fingerprint){pending={...draft,requestKey:crypto.randomUUID(),receiptToken:token(),fingerprint};safeStore(pendingKey,pending);}sending=true;$('#submit-order').disabled=true;$('#submit-order').textContent='جاري إرسال الطلب…';$('#send-error').hidden=true;try{const response=await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pending)});const data=await response.json();if(!response.ok)throw new Error(data.error||'تعذّر إرسال الطلب');receipt={id:data.order.id,token:pending.receiptToken};safeStore(receiptKey,receipt);try{localStorage.removeItem(pendingKey);localStorage.setItem('alshami-table',tableNumber);}catch{}pending=null;cart=[];persist();closeCart();renderReceipt(data.order);openReceipt();notify('وصل طلبك للكاشير. بانتظار القبول');}catch(e){$('#send-error').textContent=(e.message||'تعذّر الإرسال')+' — السلة محفوظة، وإعادة المحاولة لا تكرر الطلب.';$('#send-error').hidden=false;}finally{sending=false;$('#submit-order').disabled=false;$('#submit-order').textContent='إرسال الطلب للكاشير';}});
 if(receipt){$('#track-order').hidden=false;refreshReceipt();}
 setInterval(()=>{if(!trackedOrder||!['completed','rejected'].includes(trackedOrder.status))refreshReceipt();},5000);
+function getCatalogHash(list){
+  return JSON.stringify(list.map(x=>[x.id,x.price,x.sizes,x.name,x.available,x.category,x.image]));
+}
+let lastCatalogHash = getCatalogHash(items);
+
 async function syncLiveCatalog(){
   try{
     const res = await fetch('/api/catalog', { cache: 'no-store' });
     if(res.ok){
       const data = await res.json();
       if(Array.isArray(data) && data.length > 0){
+        const nextHash = getCatalogHash(data);
+        if(nextHash === lastCatalogHash){
+          return; // No change: do not touch DOM or trigger animations
+        }
+        lastCatalogHash = nextHash;
         items = data;
         byId = new Map(items.map(x=>[x.id,x]));
         items.forEach(x => {
@@ -72,8 +82,7 @@ async function syncLiveCatalog(){
     }
   }catch{}
 }
-syncLiveCatalog();
-setInterval(syncLiveCatalog, 4000);
+setInterval(syncLiveCatalog, 12000);
 window.addEventListener('focus', syncLiveCatalog);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshReceipt();syncLiveCatalog();}});
 

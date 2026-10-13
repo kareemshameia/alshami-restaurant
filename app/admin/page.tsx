@@ -37,6 +37,66 @@ const CATEGORIES = [
   { id: "desserts", label: "حلويات وكيك", emoji: "🍰" },
 ]
 
+function QuickSizePriceInput({
+  label,
+  price,
+  onSave,
+}: {
+  label: string
+  price: number
+  onSave: (val: number) => Promise<void>
+}) {
+  const [val, setVal] = useState(String(price))
+  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle")
+
+  useEffect(() => {
+    setVal(String(price))
+  }, [price])
+
+  const commit = async () => {
+    const num = parseFloat(val)
+    if (isNaN(num) || num <= 0 || num === Number(price)) {
+      setVal(String(price))
+      return
+    }
+    setStatus("saving")
+    await onSave(num)
+    setStatus("saved")
+    setTimeout(() => setStatus("idle"), 2500)
+  }
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-1.5 rounded-xl border bg-ink px-2.5 py-1 text-xs transition-all duration-200",
+        status === "saved"
+          ? "border-neon bg-forest/25 text-neon shadow-[0_0_10px_rgba(124,252,58,0.25)]"
+          : status === "saving"
+          ? "border-copper/60 bg-copper/10"
+          : "border-cream/15 focus-within:border-neon focus-within:ring-1 focus-within:ring-neon/30"
+      )}
+    >
+      <span className="font-semibold text-cream/70">{label}:</span>
+      <input
+        type="number"
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.currentTarget.blur()
+          }
+        }}
+        className="w-12 bg-transparent text-center font-display text-sm font-bold text-neon outline-none"
+      />
+      <span className="text-[10px] text-cream/50">₪</span>
+      {status === "saved" && (
+        <span className="text-[10px] font-bold text-neon animate-in fade-in">✓</span>
+      )}
+    </div>
+  )
+}
+
 function QuickPriceInput({
   item,
   onSave,
@@ -53,7 +113,7 @@ function QuickPriceInput({
 
   const commit = async () => {
     const num = parseFloat(val)
-    if (isNaN(num) || num <= 0 || num === item.price) {
+    if (isNaN(num) || num <= 0 || num === Number(item.price)) {
       setVal(String(item.price))
       return
     }
@@ -65,7 +125,9 @@ function QuickPriceInput({
 
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-xs text-cream/50">السعر:</span>
+      <span className="text-xs text-cream/50">
+        {item.sizes && item.sizes.length > 0 ? "السعر يبدأ من:" : "السعر:"}
+      </span>
       <div
         className={cn(
           "flex items-center rounded-xl border bg-ink px-2.5 py-1 transition-all duration-200",
@@ -222,6 +284,63 @@ export default function AdminPage() {
       }
     } catch (err) {
       console.error("Price update error:", err)
+      fetchItems()
+    }
+  }
+
+  // Quick Size Price update directly from the card
+  const handleQuickSizePriceChange = async (
+    id: string,
+    sizeIndex: number,
+    newSizePrice: number
+  ) => {
+    if (isNaN(newSizePrice) || newSizePrice <= 0) return
+
+    const targetItem = items.find((i) => i.id === id)
+    if (!targetItem || !Array.isArray(targetItem.sizes)) return
+
+    const currentSize = targetItem.sizes[sizeIndex]
+    if (!currentSize || Number(currentSize.price) === newSizePrice) return
+
+    const updatedSizes = targetItem.sizes.map((s, idx) =>
+      idx === sizeIndex ? { ...s, price: newSizePrice } : s
+    )
+
+    // If changing the first size, sync base price too
+    const updatedBasePrice = sizeIndex === 0 ? newSizePrice : Number(targetItem.price)
+
+    // Instant optimistic update on UI
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? { ...item, price: updatedBasePrice, sizes: updatedSizes }
+          : item
+      )
+    )
+
+    try {
+      const updatePayload: any = {
+        price: updatedBasePrice,
+        sizes: updatedSizes,
+        updated_at: new Date().toISOString(),
+      }
+
+      const { error } = await supabase
+        .from("menu_items")
+        .update(updatePayload)
+        .eq("id", id)
+
+      if (error) {
+        console.error("Size price update error:", error)
+        showNotification("❌ تعذر حفظ السعر في قاعدة البيانات")
+        fetchItems()
+      } else {
+        showNotification(
+          `⚡ تم تحديث سعر (${targetItem.name} — ${currentSize.label}) إلى ${newSizePrice}₪ فوراً!`
+        )
+      }
+    } catch (err) {
+      console.error("Size price update error:", err)
       fetchItems()
     }
   }
@@ -674,17 +793,27 @@ export default function AdminPage() {
                     {item.description || "بدون وصف"}
                   </p>
 
-                  {/* Sizes badges */}
+                  {/* Editable Sizes Pills right on the card */}
                   {item.sizes && item.sizes.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {item.sizes.map((s) => (
-                        <span
-                          key={s.label}
-                          className="rounded-md border border-cream/10 bg-cream/[0.04] px-2 py-0.5 text-[10px] text-cream/70"
-                        >
-                          {s.label}: <strong className="text-neon">{s.price}₪</strong>
+                    <div className="mt-3 flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-cream/65">
+                          تعديل أسعار الأحجام مباشرة:
                         </span>
-                      ))}
+                        <span className="text-[10px] text-cream/40">حفظ فوري ⚡</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {item.sizes.map((s, idx) => (
+                          <QuickSizePriceInput
+                            key={s.label}
+                            label={s.label}
+                            price={Number(s.price)}
+                            onSave={(newSizePrice) =>
+                              handleQuickSizePriceChange(item.id, idx, newSizePrice)
+                            }
+                          />
+                        ))}
+                      </div>
                     </div>
                   )}
 
