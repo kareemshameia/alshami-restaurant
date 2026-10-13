@@ -49,6 +49,33 @@ export function SiteHeader() {
     return () => observer.disconnect()
   }, [])
 
+  const handleNav = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    e.preventDefault()
+    if (id === "top") {
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      })
+    } else {
+      const el = document.getElementById(id)
+      if (el) {
+        const headerOffset = 64
+        const elementPosition = el.getBoundingClientRect().top
+        const offsetPosition = elementPosition + window.pageYOffset - headerOffset
+        window.scrollTo({
+          top: Math.max(0, offsetPosition),
+          behavior: "smooth",
+        })
+      }
+    }
+    setActive(id)
+    try {
+      window.history.pushState(null, "", `#${id}`)
+    } catch {
+      // ignore
+    }
+  }
+
   return (
     <header
       className={cn(
@@ -61,6 +88,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5 md:px-8">
         <a
           href="#top"
+          onClick={(e) => handleNav(e, "top")}
           aria-label="الشامي — العودة للأعلى"
           className="rounded-2xl transition-transform duration-300 hover:scale-[1.02] active:scale-95"
         >
@@ -75,6 +103,7 @@ export function SiteHeader() {
                 <li key={item.id}>
                   <a
                     href={`#${item.id}`}
+                    onClick={(e) => handleNav(e, item.id)}
                     className={cn(
                       "inline-flex items-center rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-300",
                       isActive
@@ -100,6 +129,7 @@ export function SiteHeader() {
           </Link>
           <a
             href="#menu"
+            onClick={(e) => handleNav(e, "menu")}
             className="flex h-10 items-center justify-center rounded-full bg-copper px-5 text-sm font-semibold text-ink shadow-[0_4px_18px_-4px_rgba(200,115,58,0.5)] transition-all duration-300 ease-out-expo hover:shadow-[0_6px_24px_-4px_rgba(200,115,58,0.7)] active:scale-95 md:hover:-translate-y-0.5"
           >
             اطلب الآن

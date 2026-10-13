@@ -5,6 +5,8 @@ import Image from "next/image"
 import Link from "next/link"
 import {
   ArrowRight,
+  ArrowUp,
+  ArrowDown,
   CheckCircle2,
   DollarSign,
   Edit3,
@@ -14,8 +16,10 @@ import {
   Lock,
   LogOut,
   Package,
+  Palette,
   Plus,
   RefreshCw,
+  Save,
   Search,
   Sparkles,
   Trash2,
@@ -35,6 +39,17 @@ const CATEGORIES = [
   { id: "fastfood", label: "برجر وفاست فود", emoji: "🍔" },
   { id: "drinks", label: "عصائر ومشروبات", emoji: "🍹" },
   { id: "desserts", label: "حلويات وكيك", emoji: "🍰" },
+]
+
+const COLOR_PRESETS = [
+  { name: "أزرق ملكي", hex: "#0b3a8c" },
+  { name: "بنفسجي ليلي", hex: "#4b1d7a" },
+  { name: "برتقالي شمسي", hex: "#a8481a" },
+  { name: "توتي وزهري", hex: "#a12f5d" },
+  { name: "زمردي فاخر", hex: "#165b33" },
+  { name: "فيروزي عميق", hex: "#0d5c75" },
+  { name: "أحمر قرمزي", hex: "#7c1a22" },
+  { name: "كلاسيكي داكن", hex: "#111827" },
 ]
 
 function QuickSizePriceInput({
@@ -174,6 +189,36 @@ export default function AdminPage() {
   const [search, setSearch] = useState("")
   const [saveSuccessMsg, setSaveSuccessMsg] = useState("")
 
+  // View Mode: 'menu' (Default Menu Manager) | 'showcase' (Drinks Showcase Control)
+  const [viewMode, setViewMode] = useState<"menu" | "showcase">("menu")
+
+  // Showcase Configuration State
+  const [showcaseConfig, setShowcaseConfig] = useState<{
+    title: string
+    highlight: string
+    description: string
+    items: {
+      id: string
+      bg: string
+      slogan: string
+      name?: string
+      image?: string
+      description?: string
+    }[]
+  }>({
+    title: "اشرب الشامي",
+    highlight: "الشامي",
+    description: "موهيتو منعش، عصير الدبدوب، وسموثي بيصحصح… اختار نكهتك.",
+    items: [
+      { id: "mojito-blue", bg: "#0b3a8c", slogan: "طاقة ما بتخلص" },
+      { id: "mojito-purple", bg: "#4b1d7a", slogan: "حيوية بدون حدود" },
+      { id: "bear-juice", bg: "#a8481a", slogan: "دبدوب الشامي بثلاث نكهات" },
+      { id: "smoothie", bg: "#a12f5d", slogan: "سموثي بيصحصح" },
+    ],
+  })
+  const [loadingShowcase, setLoadingShowcase] = useState(false)
+  const [savingShowcase, setSavingShowcase] = useState(false)
+
   // Modal State for Add / Edit
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<DBMenuItem | null>(null)
@@ -214,9 +259,115 @@ export default function AdminPage() {
     setLoading(false)
   }
 
+  // 3. Fetch Drinks Showcase config from Supabase settings
+  const fetchShowcase = async () => {
+    setLoadingShowcase(true)
+    try {
+      const { data, error } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "drinks_showcase")
+        .single()
+      if (!error && data && data.value) {
+        const parsed = typeof data.value === "string" ? JSON.parse(data.value) : data.value
+        if (parsed && Array.isArray(parsed.items)) {
+          setShowcaseConfig(parsed)
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to fetch showcase config", e)
+    } finally {
+      setLoadingShowcase(false)
+    }
+  }
+
+  // 4. Save Drinks Showcase config to Supabase settings
+  const saveShowcase = async () => {
+    setSavingShowcase(true)
+    try {
+      const jsonString = JSON.stringify(showcaseConfig)
+      const { error } = await supabase
+        .from("settings")
+        .upsert({
+          key: "drinks_showcase",
+          value: jsonString,
+        })
+      if (error) {
+        console.error("Failed to save showcase settings:", error)
+        showNotification("❌ تعذر حفظ إعدادات السلايدر")
+      } else {
+        showNotification("⚡ تم حفظ وتحديث سلايدر العصائر في الموقع فوراً!")
+      }
+    } catch (e) {
+      console.error("Error saving showcase:", e)
+      showNotification("❌ حدث خطأ أثناء الحفظ")
+    } finally {
+      setSavingShowcase(false)
+    }
+  }
+
+  const handleAddShowcaseItem = () => {
+    const availableDrinks = items.filter((i) => i.category === "drinks")
+    const unusedDrink = availableDrinks.find(
+      (d) => !showcaseConfig.items.some((item) => item.id === d.id)
+    )
+    const newId = unusedDrink ? unusedDrink.id : availableDrinks[0]?.id || "mojito-blue"
+    const newName = unusedDrink ? unusedDrink.name : availableDrinks[0]?.name || "مشروب منعش"
+    const newImage = unusedDrink ? unusedDrink.image : availableDrinks[0]?.image || "/placeholder.svg"
+
+    setShowcaseConfig((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        {
+          id: newId,
+          name: newName,
+          image: newImage,
+          bg: "#165b33",
+          slogan: "انتعاش ولذة طبيعية",
+        },
+      ],
+    }))
+  }
+
+  const handleUpdateShowcaseItem = (
+    index: number,
+    patch: Partial<{ id: string; bg: string; slogan: string; name?: string; image?: string; description?: string }>
+  ) => {
+    setShowcaseConfig((prev) => {
+      const newItems = [...prev.items]
+      newItems[index] = { ...newItems[index], ...patch }
+      return { ...prev, items: newItems }
+    })
+  }
+
+  const handleRemoveShowcaseItem = (index: number) => {
+    if (showcaseConfig.items.length <= 1) {
+      showNotification("⚠️ يجب أن يحتوي السلايدر على مشروب واحد على الأقل")
+      return
+    }
+    setShowcaseConfig((prev) => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index),
+    }))
+  }
+
+  const handleMoveShowcaseItem = (index: number, direction: "up" | "down") => {
+    setShowcaseConfig((prev) => {
+      const newItems = [...prev.items]
+      const targetIndex = direction === "up" ? index - 1 : index + 1
+      if (targetIndex < 0 || targetIndex >= newItems.length) return prev
+      const temp = newItems[index]
+      newItems[index] = newItems[targetIndex]
+      newItems[targetIndex] = temp
+      return { ...prev, items: newItems }
+    })
+  }
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchItems()
+      fetchShowcase()
     }
   }, [isAuthenticated])
 
@@ -647,30 +798,436 @@ export default function AdminPage() {
 
       {/* Main Container */}
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-        {/* Quick Stats Bar */}
-        <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
-          <div className="rounded-2xl border border-cream/10 bg-ink-soft p-3.5 sm:p-4 flex flex-col justify-between">
-            <span className="text-[11px] sm:text-xs text-cream/50">إجمالي الأصناف</span>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="font-display text-2xl sm:text-3xl font-bold text-cream">{totalCount}</span>
-              <span className="text-[11px] text-cream/40">صنف</span>
-            </div>
-          </div>
-          <div className="rounded-2xl border border-cream/10 bg-ink-soft p-3.5 sm:p-4 flex flex-col justify-between">
-            <span className="text-[11px] sm:text-xs text-cream/50">متوفر للطلب</span>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="font-display text-2xl sm:text-3xl font-bold text-neon">{availableCount}</span>
-              <span className="text-[11px] text-neon/70">جاهز</span>
-            </div>
-          </div>
-          <div className="rounded-2xl border border-cream/10 bg-ink-soft p-3.5 sm:p-4 flex flex-col justify-between">
-            <span className="text-[11px] sm:text-xs text-cream/50">نفدت الكمية</span>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="font-display text-2xl sm:text-3xl font-bold text-red-400">{outOfStockCount}</span>
-              <span className="text-[11px] text-red-400/70">موقوف</span>
-            </div>
-          </div>
+        {/* Top View Selector: Menu Items vs Drinks Showcase */}
+        <div className="flex flex-wrap items-center gap-2.5 mb-6 border-b border-cream/10 pb-4">
+          <button
+            type="button"
+            onClick={() => setViewMode("menu")}
+            className={cn(
+              "flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs sm:text-sm font-bold transition-all",
+              viewMode === "menu"
+                ? "bg-copper text-ink shadow-lg shadow-copper/25"
+                : "border border-cream/15 bg-ink-soft text-cream/70 hover:bg-cream/5 hover:text-cream"
+            )}
+          >
+            <Utensils className="size-4" />
+            <span>📋 إدارة وجبات وأسعار المنيو</span>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[11px] font-bold",
+                viewMode === "menu" ? "bg-ink/25 text-ink" : "bg-cream/10 text-cream/70"
+              )}
+            >
+              {totalCount} صنف
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode("showcase")}
+            className={cn(
+              "flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs sm:text-sm font-bold transition-all",
+              viewMode === "showcase"
+                ? "bg-neon text-ink shadow-lg shadow-neon/25"
+                : "border border-cream/15 bg-ink-soft text-cream/70 hover:bg-cream/5 hover:text-cream"
+            )}
+          >
+            <Sparkles className="size-4" />
+            <span>🍹 سلايدر العصائر والمشروبات المميزة</span>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[11px] font-bold",
+                viewMode === "showcase" ? "bg-forest/30 text-ink" : "bg-neon/15 text-neon"
+              )}
+            >
+              {showcaseConfig.items.length} شرائح
+            </span>
+          </button>
         </div>
+
+        {viewMode === "showcase" ? (
+          <div className="flex flex-col gap-6">
+            {/* Top Control Bar */}
+            <div className="flex flex-col gap-4 rounded-3xl border border-cream/15 bg-ink-soft p-5 sm:p-7 md:flex-row md:items-center md:justify-between shadow-xl">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <span className="flex size-10 items-center justify-center rounded-2xl bg-neon/15 text-neon font-bold text-lg">
+                    🍹
+                  </span>
+                  <div>
+                    <h2 className="font-display text-xl sm:text-2xl font-bold text-cream">
+                      إدارة سلايدر العصائر (اشرب الشامي)
+                    </h2>
+                    <p className="mt-1 text-xs text-cream/60">
+                      تحكم كامل بالألوان الخلفية لكل مشروب، العبارات الدعائية، الترتيب، وإضافة أي مشروب جديد.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={saveShowcase}
+                  disabled={savingShowcase}
+                  className="flex items-center gap-2 rounded-2xl bg-neon px-6 py-3 font-display text-sm font-bold text-ink shadow-[0_4px_20px_rgba(124,252,58,0.3)] transition-transform hover:scale-105 active:scale-95 disabled:opacity-50"
+                >
+                  <Save className="size-4" />
+                  <span>{savingShowcase ? "جاري الحفظ..." : "حفظ التعديلات فوراً 💾"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* General Section Heading Settings */}
+            <div className="rounded-3xl border border-cream/15 bg-ink-soft p-5 sm:p-6 shadow-xl">
+              <h3 className="font-display text-base font-bold text-cream flex items-center gap-2 border-b border-cream/10 pb-3">
+                <SlidersHorizontal className="size-4 text-copper" />
+                <span>نصوص عنوان القسم الترويجي</span>
+              </h3>
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <label className="text-xs font-bold text-cream/70 block mb-1.5">العنوان الرئيسي</label>
+                  <input
+                    type="text"
+                    value={showcaseConfig.title}
+                    onChange={(e) => setShowcaseConfig((prev) => ({ ...prev, title: e.target.value }))}
+                    className="h-11 w-full rounded-xl border border-cream/15 bg-ink px-3.5 text-xs text-cream focus:border-neon focus:outline-none"
+                    placeholder="اشرب الشامي"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-cream/70 block mb-1.5">الكلمة الملونة بالأخضر النعناعي</label>
+                  <input
+                    type="text"
+                    value={showcaseConfig.highlight}
+                    onChange={(e) => setShowcaseConfig((prev) => ({ ...prev, highlight: e.target.value }))}
+                    className="h-11 w-full rounded-xl border border-cream/15 bg-ink px-3.5 text-xs text-cream focus:border-neon focus:outline-none"
+                    placeholder="الشامي"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-cream/70 block mb-1.5">الوصف التعريفي</label>
+                  <input
+                    type="text"
+                    value={showcaseConfig.description}
+                    onChange={(e) => setShowcaseConfig((prev) => ({ ...prev, description: e.target.value }))}
+                    className="h-11 w-full rounded-xl border border-cream/15 bg-ink px-3.5 text-xs text-cream focus:border-neon focus:outline-none"
+                    placeholder="موهيتو منعش، عصير الدبدوب، وسموثي بيصحصح… اختار نكهتك."
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Drinks Slides Header & Add Button */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-display text-lg font-bold text-cream flex items-center gap-2">
+                  <Palette className="size-5 text-neon" />
+                  <span>شرائح المشروبات المعروضة في السلايدر ({showcaseConfig.items.length})</span>
+                </h3>
+                <p className="text-xs text-cream/50 mt-0.5">
+                  كل شريحة يمكنك تحديد المشروب، العبارة، ولون خلفية القسم الخاص بها
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAddShowcaseItem}
+                className="flex items-center gap-1.5 rounded-xl bg-copper px-4 py-2.5 text-xs font-bold text-ink shadow-[0_4px_16px_rgba(200,115,58,0.25)] hover:scale-105 active:scale-95 transition-all"
+              >
+                <Plus className="size-4" />
+                <span>إضافة مشروب جديد للسلايدر</span>
+              </button>
+            </div>
+
+            {/* Slides Cards List */}
+            <div className="flex flex-col gap-5">
+              {showcaseConfig.items.map((slide, index) => {
+                const matchedItem = items.find((i) => i.id === slide.id)
+                const drinkImage = slide.image || matchedItem?.image || "/placeholder.svg"
+                const drinkName = slide.name || matchedItem?.name || slide.id
+                const availableDrinks = items.filter((i) => i.category === "drinks")
+
+                return (
+                  <div
+                    key={`${slide.id}-${index}`}
+                    className="group relative flex flex-col gap-5 rounded-3xl border border-cream/15 bg-ink-soft p-5 sm:p-6 transition-all duration-300 hover:border-cream/30 shadow-xl"
+                    style={{
+                      borderRightWidth: "6px",
+                      borderRightColor: slide.bg,
+                    }}
+                  >
+                    {/* Slide Header: Index, Title, Actions */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cream/10 pb-4">
+                      <div className="flex items-center gap-3">
+                        <span className="flex size-8 items-center justify-center rounded-xl bg-cream/10 font-display text-xs font-bold text-neon">
+                          #{index + 1}
+                        </span>
+                        <div className="relative size-12 overflow-hidden rounded-xl border border-cream/15 bg-ink">
+                          <Image
+                            src={drinkImage}
+                            alt={drinkName}
+                            fill
+                            sizes="48px"
+                            className="object-cover"
+                          />
+                        </div>
+                        <div>
+                          <h4 className="font-display text-base font-bold text-cream">
+                            {drinkName}
+                          </h4>
+                          <span className="text-xs text-cream/50">
+                            معرّف المشروب: {slide.id}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Order and Delete Controls */}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleMoveShowcaseItem(index, "up")}
+                          disabled={index === 0}
+                          title="تحريك لأعلى"
+                          className="flex size-9 items-center justify-center rounded-xl border border-cream/10 bg-ink text-cream/70 hover:bg-cream/10 hover:text-cream disabled:opacity-30 disabled:hover:bg-ink transition-colors"
+                        >
+                          <ArrowUp className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMoveShowcaseItem(index, "down")}
+                          disabled={index === showcaseConfig.items.length - 1}
+                          title="تحريك لأسفل"
+                          className="flex size-9 items-center justify-center rounded-xl border border-cream/10 bg-ink text-cream/70 hover:bg-cream/10 hover:text-cream disabled:opacity-30 disabled:hover:bg-ink transition-colors"
+                        >
+                          <ArrowDown className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveShowcaseItem(index)}
+                          title="حذف الشريحة"
+                          className="flex size-9 items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Inputs Row */}
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {/* 1. Select Drink from menu */}
+                      <div>
+                        <label className="text-xs font-bold text-cream/70 block mb-1.5">
+                          المشروب المربوط من القائمة
+                        </label>
+                        <select
+                          value={slide.id}
+                          onChange={(e) => {
+                            const selectedId = e.target.value
+                            const found = items.find((i) => i.id === selectedId)
+                            if (found) {
+                              handleUpdateShowcaseItem(index, {
+                                id: found.id,
+                                name: found.name,
+                                image: found.image,
+                              })
+                            } else {
+                              handleUpdateShowcaseItem(index, { id: selectedId })
+                            }
+                          }}
+                          className="h-11 w-full rounded-xl border border-cream/15 bg-ink px-3 text-xs text-cream outline-none focus:border-neon"
+                        >
+                          {availableDrinks.map((d) => (
+                            <option key={d.id} value={d.id}>
+                              🍹 {d.name} ({d.price}₪)
+                            </option>
+                          ))}
+                          {!availableDrinks.some((d) => d.id === slide.id) && (
+                            <option value={slide.id}>{slide.name || slide.id}</option>
+                          )}
+                        </select>
+                      </div>
+
+                      {/* 2. Slogan */}
+                      <div>
+                        <label className="text-xs font-bold text-cream/70 block mb-1.5">
+                          العبارة التسويقية فوق المشروب
+                        </label>
+                        <input
+                          type="text"
+                          value={slide.slogan}
+                          onChange={(e) => handleUpdateShowcaseItem(index, { slogan: e.target.value })}
+                          placeholder="مثال: طاقة ما بتخلص، حيوية بدون حدود"
+                          className="h-11 w-full rounded-xl border border-cream/15 bg-ink px-3.5 text-xs text-cream outline-none focus:border-neon"
+                        />
+                      </div>
+
+                      {/* 3. Custom Image URL or Override (optional) */}
+                      <div>
+                        <label className="text-xs font-bold text-cream/70 block mb-1.5">
+                          رابط صورة مخصص (اختياري)
+                        </label>
+                        <input
+                          type="text"
+                          value={slide.image || ""}
+                          onChange={(e) => handleUpdateShowcaseItem(index, { image: e.target.value })}
+                          placeholder="اتركه فارغاً لاعتماد صورة الوجبة"
+                          className="h-11 w-full rounded-xl border border-cream/15 bg-ink px-3.5 text-xs text-cream outline-none focus:border-neon text-left"
+                          dir="ltr"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Color Customization Row */}
+                    <div className="rounded-2xl border border-cream/10 bg-ink/60 p-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                        <label className="text-xs font-bold text-cream flex items-center gap-2">
+                          <Palette className="size-4 text-neon" />
+                          <span>لون خلفية السلايدر عند ظهور هذا المشروب:</span>
+                        </label>
+
+                        {/* Interactive Color Picker Box */}
+                        <div className="flex items-center gap-3">
+                          <label className="relative flex items-center gap-2.5 cursor-pointer rounded-xl border border-cream/20 bg-ink px-3 py-1.5 hover:border-neon transition-colors">
+                            <span
+                              className="size-6 rounded-lg border border-white/30 shadow-inner"
+                              style={{ backgroundColor: slide.bg }}
+                            />
+                            <span className="font-mono text-xs font-bold text-cream uppercase">
+                              {slide.bg}
+                            </span>
+                            <input
+                              type="color"
+                              value={slide.bg}
+                              onChange={(e) => handleUpdateShowcaseItem(index, { bg: e.target.value })}
+                              className="sr-only"
+                            />
+                          </label>
+
+                          <input
+                            type="text"
+                            maxLength={7}
+                            value={slide.bg}
+                            onChange={(e) => handleUpdateShowcaseItem(index, { bg: e.target.value })}
+                            className="w-24 h-9 rounded-xl border border-cream/15 bg-ink px-2.5 text-xs font-mono text-center text-cream uppercase focus:border-neon outline-none"
+                            placeholder="#0B3A8C"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Color Preset Palette Buttons */}
+                      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-cream/10">
+                        <span className="text-[11px] text-cream/50">ألوان سريعة جاهزة:</span>
+                        {COLOR_PRESETS.map((preset) => (
+                          <button
+                            key={preset.hex}
+                            type="button"
+                            onClick={() => handleUpdateShowcaseItem(index, { bg: preset.hex })}
+                            className={cn(
+                              "flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-all hover:scale-105 active:scale-95",
+                              slide.bg.toLowerCase() === preset.hex.toLowerCase()
+                                ? "border-neon bg-forest/30 text-neon ring-1 ring-neon"
+                                : "border-cream/10 bg-ink text-cream/70 hover:border-cream/30"
+                            )}
+                          >
+                            <span
+                              className="size-3 rounded-full border border-white/20"
+                              style={{ backgroundColor: preset.hex }}
+                            />
+                            <span>{preset.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Live Slide Preview Banner */}
+                    <div
+                      className="relative overflow-hidden rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-4 transition-colors duration-500"
+                      style={{ backgroundColor: slide.bg }}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="relative size-16 sm:size-20 shrink-0">
+                          <Image
+                            src={drinkImage}
+                            alt={drinkName}
+                            fill
+                            sizes="80px"
+                            className="object-contain drop-shadow-xl"
+                          />
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs font-bold text-cream/70 block">
+                            {slide.slogan}
+                          </span>
+                          <h4 className="font-display text-lg sm:text-xl font-bold text-cream drop-shadow">
+                            {drinkName}
+                          </h4>
+                          <span className="text-[11px] text-cream/60">
+                            {matchedItem?.description || "منعش ولذيذ"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="hidden sm:flex flex-col items-end gap-1 shrink-0">
+                        <span className="rounded-full bg-cream/20 px-3 py-1 text-xs font-bold text-cream backdrop-blur-sm">
+                          معاينة حية للشريحة
+                        </span>
+                        <span className="font-mono text-[10px] text-cream/70">
+                          الخلفية: {slide.bg}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Bottom Floating Save Bar */}
+            <div className="sticky bottom-6 z-20 flex items-center justify-between rounded-2xl border border-neon/30 bg-ink/95 p-4 shadow-2xl backdrop-blur-xl">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="size-5 text-neon" />
+                <span className="text-xs sm:text-sm font-semibold text-cream">
+                  لديك {showcaseConfig.items.length} مشروبات جاهزة في السلايدر
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={saveShowcase}
+                disabled={savingShowcase}
+                className="flex items-center gap-2 rounded-xl bg-neon px-5 py-2.5 font-display text-xs sm:text-sm font-bold text-ink shadow-[0_4px_16px_rgba(124,252,58,0.3)] transition-transform hover:scale-105 active:scale-95 disabled:opacity-50"
+              >
+                <Save className="size-4" />
+                <span>{savingShowcase ? "جاري الحفظ..." : "حفظ التغييرات الآن 💾"}</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Quick Stats Bar */}
+            <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
+              <div className="rounded-2xl border border-cream/10 bg-ink-soft p-3.5 sm:p-4 flex flex-col justify-between">
+                <span className="text-[11px] sm:text-xs text-cream/50">إجمالي الأصناف</span>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="font-display text-2xl sm:text-3xl font-bold text-cream">{totalCount}</span>
+                  <span className="text-[11px] text-cream/40">صنف</span>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-cream/10 bg-ink-soft p-3.5 sm:p-4 flex flex-col justify-between">
+                <span className="text-[11px] sm:text-xs text-cream/50">متوفر للطلب</span>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="font-display text-2xl sm:text-3xl font-bold text-neon">{availableCount}</span>
+                  <span className="text-[11px] text-neon/70">جاهز</span>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-cream/10 bg-ink-soft p-3.5 sm:p-4 flex flex-col justify-between">
+                <span className="text-[11px] sm:text-xs text-cream/50">نفدت الكمية</span>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="font-display text-2xl sm:text-3xl font-bold text-red-400">{outOfStockCount}</span>
+                  <span className="text-[11px] text-red-400/70">موقوف</span>
+                </div>
+              </div>
+            </div>
 
         {/* Action & Filter Toolbar */}
         <div className="flex flex-col gap-3.5 sm:flex-row sm:items-center sm:justify-between">
@@ -866,7 +1423,9 @@ export default function AdminPage() {
             ))}
           </div>
         )}
-      </main>
+      </>
+    )}
+  </main>
 
       {/* Easy & Intuitive Add/Edit Modal */}
       {isModalOpen && (

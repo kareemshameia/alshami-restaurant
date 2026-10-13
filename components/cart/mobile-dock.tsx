@@ -29,6 +29,33 @@ export function MobileDock() {
     return () => observer.disconnect()
   }, [])
 
+  const handleNav = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    e.preventDefault()
+    if (id === "top") {
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      })
+    } else {
+      const el = document.getElementById(id)
+      if (el) {
+        const headerOffset = 64
+        const elementPosition = el.getBoundingClientRect().top
+        const offsetPosition = elementPosition + window.pageYOffset - headerOffset
+        window.scrollTo({
+          top: Math.max(0, offsetPosition),
+          behavior: "smooth",
+        })
+      }
+    }
+    setCurrent(id)
+    try {
+      window.history.pushState(null, "", `#${id}`)
+    } catch {
+      // ignore
+    }
+  }
+
   const linkTone = (id: string) =>
     current === id
       ? "text-neon font-semibold scale-105"
@@ -44,7 +71,12 @@ export function MobileDock() {
     >
       <ul className="mx-auto grid max-w-md grid-cols-5 items-center rounded-full border border-cream/10 bg-ink/90 p-1.5 shadow-[0_18px_45px_-10px_rgba(0,0,0,0.7)] backdrop-blur-xl">
         <li>
-          <a href="#top" className={cn(itemClass, linkTone("top"))} aria-current={current === "top" ? "true" : undefined}>
+          <a
+            href="#top"
+            onClick={(e) => handleNav(e, "top")}
+            className={cn(itemClass, linkTone("top"))}
+            aria-current={current === "top" ? "true" : undefined}
+          >
             <House className="size-5 transition-transform" aria-hidden="true" />
             الرئيسية
           </a>
@@ -52,6 +84,7 @@ export function MobileDock() {
         <li>
           <a
             href="#pizza"
+            onClick={(e) => handleNav(e, "pizza")}
             className={cn(itemClass, linkTone("pizza"))}
             aria-current={current === "pizza" ? "true" : undefined}
           >
@@ -78,7 +111,12 @@ export function MobileDock() {
           </button>
         </li>
         <li>
-          <a href="#menu" className={cn(itemClass, linkTone("menu"))} aria-current={current === "menu" ? "true" : undefined}>
+          <a
+            href="#menu"
+            onClick={(e) => handleNav(e, "menu")}
+            className={cn(itemClass, linkTone("menu"))}
+            aria-current={current === "menu" ? "true" : undefined}
+          >
             <UtensilsCrossed className="size-5" aria-hidden="true" />
             المنيو
           </a>
